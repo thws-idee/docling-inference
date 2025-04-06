@@ -14,6 +14,8 @@ from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOption
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.document import DoclingDocument
 from docling_core.types.io import DocumentStream
+from docling.datamodel.pipeline_options import smolvlm_picture_description
+from docling.utils import model_downloader
 from fastapi import (
     Depends,
     FastAPI,
@@ -50,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             InputFormat.PDF: PdfFormatOption(
                 pipeline_options=PdfPipelineOptions(
                     ocr_options=EasyOcrOptions(lang=ocr_languages),
+                    picture_description_options = smolvlm_picture_description,
                     do_code_enrichment=True,
                     do_formula_enrichment=True,
                     do_picture_classification=True,
@@ -190,6 +193,7 @@ def _get_output(document: DoclingDocument, format: OutputFormat) -> str:
 
 if __name__ == "__main__":
     config = Config()
+    model_downloader.download_models()
     uvicorn.run(
         "src.main:app",
         host="0.0.0.0",

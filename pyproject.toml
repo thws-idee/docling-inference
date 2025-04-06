@@ -6,29 +6,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "docling>=2.28.0",
+    "docling[vlm]",
     "fastapi>=0.115.6",
     "uvicorn>=0.32.1",
     "python-multipart>=0.0.19",
+    "torch>=2.5.0",
+    "torchvision>=0.20.0",
 ]
-
-[project.optional-dependencies]
-cu121 = [
-  "torch>=2.5.0",
-  "torchvision>=0.20.0",
-]
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cu121", extra = "cu121" },
-]
-torchvision = [
-  { index = "pytorch-cu121", extra = "cu121" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
 
 [build-system]
 requires = ["setuptools"]
