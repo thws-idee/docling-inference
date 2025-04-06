@@ -5,7 +5,7 @@ description = "Docling inference server"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "docling>=2.23.0",
+    "docling>=2.28.0",
     "fastapi>=0.115.6",
     "uvicorn>=0.32.1",
     "python-multipart>=0.0.19",
@@ -24,25 +24,17 @@ cu121 = [
 [tool.uv]
 conflicts = [
   [
-    { extra = "cpu" },
     { extra = "cu121" },
   ],
 ]
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cpu", extra = "cpu" },
   { index = "pytorch-cu121", extra = "cu121" },
 ]
 torchvision = [
-  { index = "pytorch-cpu", extra = "cpu" },
   { index = "pytorch-cu121", extra = "cu121" },
 ]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cu121"
