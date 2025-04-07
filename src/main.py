@@ -209,7 +209,7 @@ def parse_document_stream(
 
     doc = result.document
     output = _get_output(doc, payload.output_format)
-    
+    json_output = doc.export_to_dict() if payload.include_json else None
     for element, _level in doc.iterate_items():
         if isinstance(element, PictureItem):
             logger.debug(element.self_ref)
