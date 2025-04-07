@@ -12,7 +12,7 @@ from docling.datamodel.base_models import (
 from docling.datamodel.document import ConversionResult
 from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling_core.types.doc.document import DoclingDocument
+from docling_core.types.doc.document import DoclingDocument, PictureItem, PictureDescriptionData, PictureClassificationData
 from docling_core.types.io import DocumentStream
 from docling.datamodel.pipeline_options import smolvlm_picture_description
 from docling.utils import model_downloader
@@ -45,6 +45,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Setup and teardown events of the app"""
     # Setup
     config = Config()
+    picture_enrichment_options = smolvlm_picture_description
+    picture_enrichment_options.prompt = "Describe the image in three sentences. Be consise and accurate. If it shows a table try to extract the data formated as markdown. Do not repeat the sentence the image shows"
 
     ocr_languages = config.ocr_languages.split(",")
     converter = DocumentConverter(
@@ -52,7 +54,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             InputFormat.PDF: PdfFormatOption(
                 pipeline_options=PdfPipelineOptions(
                     ocr_options=EasyOcrOptions(lang=ocr_languages),
-                    picture_description_options = smolvlm_picture_description,
+                    picture_description_options = picture_enrichment_options,
+                    images_scale = 2.0,
+                    generate_picture_images = True,
+                    do_table_structure=True,
                     do_code_enrichment=True,
                     do_formula_enrichment=True,
                     do_picture_classification=True,
@@ -128,10 +133,52 @@ def parse_document_url(
     convert: ConvertFunc = Depends(convert),
     _=Depends(authorize_header),
 ) -> ParseResponse:
-    result = convert(payload.url)
-    output = _get_output(result.document, payload.output_format)
+    try:
+        result = convert(payload.url)
+    except:
+        return ParseResponse(
+            message="Document not parsed",
+            status="NOk",
+            data=ParseResponseData(output="Ask Andreas Schiffler", json_output={}),
+    )
 
-    json_output = result.document.export_to_dict() if payload.include_json else None
+    doc = result.document
+    output = _get_output(doc, payload.output_format)
+    json_output = doc.export_to_dict() if payload.include_json else None
+    for element, _level in doc.iterate_items():
+        if isinstance(element, PictureItem):
+            logger.debug(element.self_ref)
+            logger.debug(element.caption_text(doc=doc))
+            for annotation in element.annotations:
+                if isinstance(annotation,PictureClassificationData):
+                    logger.debug(annotation.predicted_classes[0].class_name)
+                if isinstance(annotation,PictureDescriptionData):
+                    logger.debug(annotation.text)
+
+    picture_data = []
+
+    for element, _level in doc.iterate_items():
+        if isinstance(element, PictureItem):
+            picture_info = {
+                "self_ref": element.self_ref,
+                "caption_text": element.caption_text(doc=doc),
+                "annotations": [],
+            }
+            for annotation in element.annotations:
+                if isinstance(annotation, PictureClassificationData):
+                    picture_info["annotations"].append({
+                        "type": "classification",
+                        "predicted_class": annotation.predicted_classes[0].class_name,
+                    })
+                if isinstance(annotation, PictureDescriptionData):
+                    picture_info["annotations"].append({
+                        "type": "description",
+                        "text": annotation.text,
+                    })
+            picture_data.append(picture_info)
+
+    json_output = json_output or {}
+    json_output["picture_data"] = picture_data
 
     return ParseResponse(
         message="Document parsed successfully",
@@ -151,11 +198,51 @@ def parse_document_stream(
     data = DocumentStream(
         name=file.filename or "unset_name", stream=BytesIO(binary_data)
     )
+    try:
+        result = convert(data)
+    except:
+        return ParseResponse(
+            message="Document not parsed",
+            status="NOk",
+            data=ParseResponseData(output="Ask Andreas Schiffler", json_output={}),
+    )
 
-    result = convert(data)
-    output = _get_output(result.document, payload.output_format)
+    doc = result.document
+    output = _get_output(doc, payload.output_format)
+    
+    for element, _level in doc.iterate_items():
+        if isinstance(element, PictureItem):
+            logger.debug(element.self_ref)
+            logger.debug(element.caption_text(doc=doc))
+            for annotation in element.annotations:
+                if isinstance(annotation,PictureClassificationData):
+                    logger.debug(annotation.predicted_classes[0].class_name)
+                if isinstance(annotation,PictureDescriptionData):
+                    logger.debug(annotation.text)
+    picture_data = []
 
-    json_output = result.document.export_to_dict() if payload.include_json else None
+    for element, _level in doc.iterate_items():
+        if isinstance(element, PictureItem):
+            picture_info = {
+                "self_ref": element.self_ref,
+                "caption_text": element.caption_text(doc=doc),
+                "annotations": [],
+            }
+            for annotation in element.annotations:
+                if isinstance(annotation, PictureClassificationData):
+                    picture_info["annotations"].append({
+                        "type": "classification",
+                        "predicted_class": annotation.predicted_classes[0].class_name,
+                    })
+                if isinstance(annotation, PictureDescriptionData):
+                    picture_info["annotations"].append({
+                        "type": "description",
+                        "text": annotation.text,
+                    })
+            picture_data.append(picture_info)
+
+    json_output = json_output or {}
+    json_output["picture_data"] = picture_data
 
     return ParseResponse(
         message="Document parsed successfully",
